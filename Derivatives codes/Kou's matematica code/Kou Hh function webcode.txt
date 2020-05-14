@@ -1,0 +1,126 @@
+
+(* The code to compute the option pricing formulae as in Kou (1999, revised 2000, 2001, 2002)
+"A jump diffusion model for option pricing", 
+2002, Management Science, Vol. 48, August, pp. 1086-1101. 
+Copyright by S. G. Kou, Dept. of IEOR, Columbia University, tel: 212-854-4334. *)
+
+
+
+(* Modified on Oct 15, 01. *)
+
+(*Step 1. Define phi, Hh,  I function, Pni and Qni*) 
+
+phi[x_] = (1 + Erf[x/Sqrt[2]])/2 
+
+(* phi[x_] := If[(x<10)&&(x>-10), (1 + Erf[x/Sqrt[2]])/2, 0] *)
+
+(*
+Hh[n_, x_] := Sqrt[Pi/(2^n)]*Exp[-(x^2)/2]*
+        (Hypergeometric1F1[(n+1)/2, 1/2, (x^2)/2] / (Sqrt[2]*Gamma [1+ (n/2)] )  
+         - x * Hypergeometric1F1[(n/2)+1, 3/2, (x^2)/2] / (Gamma [(1+ n)/2] ) 
+        )
+*)
+
+Hh[n_, x_] := If[x >= -6 , If [x <10, 1/n!*NIntegrate[(t - x)^n*Exp[-t^2/2], 
+       {t, x, Infinity}], 0], 
+      (temp = (x + Sqrt[x*x +4*n])*0.5; 
+  ( NIntegrate[(t - x)^n*Exp[-t^2/2], {t, x, temp-3 }]+
+  NIntegrate[(t - x)^n*Exp[-t^2/2], {t, temp-3 , temp-1 }]+
+  NIntegrate[(t - x)^n*Exp[-t^2/2], {t, temp-1 , temp }]+
+  NIntegrate[(t - x)^n*Exp[-t^2/2], {t, temp, temp+1 }]+
+  NIntegrate[(t - x)^n*Exp[-t^2/2], {t, temp+1 , temp+3 }]+
+  NIntegrate[(t - x)^n*Exp[-t^2/2], {t, temp+3, Infinity }]  )
+   /(n!)  ) ]
+
+
+(*
+Hh[m_, y_] := 
+(   Ha[n_] := (-y/n)*Ha[n - 1] + (1/n)*Ha[n - 2]; 
+    Ha[-1] = Exp[-y^2/2]; Ha[0] = Sqrt[2*Pi]*phi[-y];
+    Ha[m]) 
+*)
+
+
+II[jj_, ll_, aa_, bb_, dd_] :=
+Which[ (bb >0 && aa !=0 ), 
+ - (Exp[aa*ll]/aa) * (Table[(bb/aa)^(jj-i), {i, 0, jj}] . Table[Hh[i, bb*ll-dd], {i, 0, jj}]) +
+  ((bb /aa)^(jj+1) )*(Sqrt[2*Pi]/bb)*Exp[aa*dd/bb + (1/2) * (aa/bb)^2 ] *
+  phi[-bb*ll + dd + aa/bb],
+ (bb<0 && aa <0),
+ - (Exp[aa*ll]/aa) *(Table[(bb/aa)^(jj-i), {i, 0, jj}] . Table[Hh[i, bb*ll-dd], {i, 0, jj}]) -
+  ((bb /aa)^(jj+1) )*(Sqrt[2*Pi]/bb)*Exp[aa*dd/bb + (1/2) * (aa/bb)^2 ] *
+  phi[bb*ll - dd - aa/bb],
+ (bb >0 && aa ==0),
+  Hh[n+1, bb*ll -dd]/bb
+  ]
+
+Pni[n_, i_, p_, eta1_, eta2_] := Sum[ Binomial[n, j]*( p^j )* ((1-p)^(n-j) )*Binomial[n-i-1, j-i]*
+       ( (eta1/(eta1 +eta2))^(j-i) ) * ( (eta2/(eta1 + eta2))^(n-j)),
+      {j, i, n-1}] /; i<n
+Pni[n_, n_, p_, eta1_, eta2_] = p^n
+
+Qni[n_, i_, p_, eta1_, eta2_] := Sum[ Binomial[n, j]*( (1-p)^j )* ( p^(n-j) )*Binomial[n-i-1, j-i]*
+       ( (eta2 /(eta1 + eta2) )^(j-i) ) * ( (eta1 /(eta1 + eta2))^(n-j)),
+       {j, i, n-1}] /; i<n
+Qni[n_, n_, p_, eta1_, eta2_] =(1-p)^n
+
+
+
+
+
+(*Step 2a. calculate the call price *)
+ 
+cprob[mu_, eta1_, eta2_, la_, p_, sig_, aa_,  bigT_, nStep_] := 
+ ( IITwo = Table[  II[k-1, aa - mu * bigT, -eta1, -1/(sig*Sqrt[bigT]), -(sig*Sqrt[bigT])*eta1],
+                  {k, 1, nStep}];
+
+  IIFour = Table[ II[k-1, aa - mu * bigT, eta2, 1/(sig*Sqrt[bigT]), -(sig*Sqrt[bigT])*eta2],
+                    {k, 1, nStep}];
+
+   PiN[n_] = Exp[-la*bigT]*((la*bigT)^n) /(n!);
+
+  PiNPni = Table [PiN[n] * Pni[n, k, p, eta1, eta2] * ((sig*Sqrt[bigT]*eta1)^k)
+                  , {n, 1, nStep}, {k, 1, n}]; 
+  PiNQni = Table [PiN[n] * Qni[n, k, p, eta1, eta2] * ((sig*Sqrt[bigT]*eta2)^k)
+                   , {n, 1, nStep}, {k, 1, n}];
+
+                 
+   sec = Sum[PiNPni[[n, k]] * IITwo[[k]], {n, 1, nStep}, {k, 1, n}];
+
+  fourth = Sum[PiNQni [[n, k]] * IIFour[[k]], {n, 1, nStep}, {k, 1, n}];
+   
+   (sec * Exp[((sig*eta1)^2)*bigT/2] + fourth * Exp[((sig*eta2)^2)*bigT/2]) /( Sqrt[2*Pi] * sig * Sqrt[bigT] ) + 
+    Exp[- la* bigT] * phi [-(aa- mu*bigT)/(sig*Sqrt[bigT])]
+ )
+
+(* the function callOR computes the regular call price for stock options*)
+
+callOR[eta1_, eta2_, la_, p_, sig_, rr_, bigS_, bigK_,  bigT_, nStep_] :=
+(
+      zetaaOR = p*eta1 /(eta1 -1) + (1-p)*eta2/(eta2+1) -1;
+      tempaa1OR =  rr + sig*sig/2 - la*zetaaOR;
+      tempaa2OR = tempaa1OR - sig*sig;
+
+    bigS * 
+ cprob[tempaa1OR, eta1 - 1, eta2 + 1, la *(1+zetaaOR), p*eta1/((1+zetaaOR)*(eta1-1)), sig, Log[bigK/bigS],  bigT, nStep] -
+  bigK * Exp[- rr*bigT] *
+  cprob[tempaa2OR, eta1, eta2, la, p, sig, Log[bigK/bigS],  bigT, nStep] 
+
+) 
+
+
+(* the function call computes the regular call price for futures options*)
+
+ 
+call[eta1_, eta2_, la_, p_, sig_, bond_, bigF_, bigK_,  bigT_, nStep_] :=
+(
+      zetaa = p*eta1 /(eta1 -1) + (1-p)*eta2/(eta2+1) -1;
+      tempaa1 =   sig*sig/2 - la*zetaa;
+      tempaa2 = tempaa1 - sig*sig;
+
+   bond* ( bigF * 
+ cprob[tempaa1, eta1 - 1, eta2 + 1, la *(1+zetaa), p*eta1/((1+zetaa)*(eta1-1)), sig, Log[bigK/(bigF)],  bigT, nStep] -
+  bigK *
+  cprob[tempaa2, eta1, eta2, la, p, sig, Log[bigK/(bigF)],  bigT, nStep] )
+
+) 
