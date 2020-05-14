@@ -1,6 +1,6 @@
 # AMERICAN OPTION PRICING IN A JUMP-DIFFUSION MODEL
 
-## Abstract
+## Abstract from 2008 Thesis
 
 Many alternative models have been developed lately to generalize the Black-Scholes 
 option pricing model in order to incorporate more empirical features. Brownian motion
@@ -18,5 +18,5 @@ the price and related hedging parameters.
 ## Content
 
 - Matlab model code
-- Thesis
+- 2008 Thesis
 - Comparative Derivative codes
