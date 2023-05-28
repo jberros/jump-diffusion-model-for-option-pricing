@@ -1,15 +1,27 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[50]:
+
+
 """
 Created on Sun May 28 15:13:56 2023
 
 @author: jeremy
 """
 
+
+# In[51]:
+
+
 import math
 import pandas as pd
-import scipy.special as sp
-from scipy.special import gamma, hypergeom
+# import scipy.special as sp
+# from scipy.special import gamma, hypergeom
 from scipy.integrate import quad
+
+
+# In[52]:
 
 
 def phi(x):
@@ -18,8 +30,16 @@ def phi(x):
     else:
         return 0
 
+
+# In[53]:
+
+
 def temp(n, x):
     return x + math.sqrt(x**2 + 4*n) / 2
+
+
+# In[54]:
+
 
 def Hh(n, x):
     def integrand(t, n, x):
@@ -40,6 +60,10 @@ def Hh(n, x):
 
     return Hh
 
+
+# In[55]:
+
+
 def Ha(m, y):
     if m == -1:
         return math.exp(-y**2/2)
@@ -48,86 +72,95 @@ def Ha(m, y):
     else:
         return (-y/m)*Ha(m - 1, y) + (1/m)*Ha(m - 2, y)
 
-def Table(func, values):
-    return [func(i) for i in values]
+
+# In[56]:
+
 
 def II(jj, ll, aa, bb, dd):
     if bb > 0 and aa != 0:
-        II = -(math.exp(aa * ll) / aa) * sum([Table(lambda i: (bb / aa) ** (jj - i), range(jj + 1))] *
-                                             [Table(lambda i: Hh(i, bb * ll - dd), range(jj + 1))]) + \
-             ((bb / aa) ** (jj + 1)) * (math.sqrt(2 * math.pi) / bb) * math.exp(aa * dd / bb + (1 / 2) * (aa / bb) ** 2) * \
-             phi(-bb * ll + dd + aa / bb)
-
+        table1 = {i: (bb/aa)**(jj-i) for i in range(jj+1)}
+        table2 = {i: Hh(i, bb*ll-dd) for i in range(jj+1)}
+        II = -(math.exp(aa*ll)/aa) * sum(table1[i] * table2[i] for i in range(jj+1)) +             ((bb/aa)**(jj+1)) * (math.sqrt(2*math.pi)/bb) * math.exp(aa*dd/bb + (1/2) * (aa/bb)**2) * phi(-bb*ll + dd + aa/bb)
     elif bb < 0 and aa < 0:
-        II = -(math.exp(aa * ll) / aa) * sum([Table(lambda i: (bb / aa) ** (jj - i), range(jj + 1))] *
-                                             [Table(lambda i: Hh(i, bb * ll - dd), range(jj + 1))]) - \
-             ((bb / aa) ** (jj + 1)) * (math.sqrt(2 * math.pi) / bb) * math.exp(aa * dd / bb + (1 / 2) * (aa / bb) ** 2) * \
-             phi(bb * ll - dd - aa / bb)
-
+        table1 = {i: (bb/aa)**(jj-i) for i in range(jj+1)}
+        table2 = {i: Hh(i, bb*ll-dd) for i in range(jj+1)}
+        II = -(math.exp(aa*ll)/aa) * sum(table1[i] * table2[i] for i in range(jj+1)) -             ((bb/aa)**(jj+1)) * (math.sqrt(2*math.pi)/bb) * math.exp(aa*dd/bb + (1/2) * (aa/bb)**2) * phi(bb*ll - dd - aa/bb)
     elif bb > 0 and aa == 0:
-        II = Hh(jj + 1, bb * ll - dd) / bb
-
+        II = Hh(jj + 1, bb*ll - dd)/bb
     return II
+
+
+# In[57]:
+
 
 def Pni(n, i, p, eta1, eta2):
     Pni = 0
     for j in range(i, n):
-        Pni += math.comb(n, j) * (p ** j) * ((1 - p) ** (n - j)) * math.comb(n - i - 1, j - i) * \
-               ((eta1 / (eta1 + eta2)) ** (j - i)) * ((eta2 / (eta1 + eta2)) ** (n - j))
+        Pni += math.comb(n, j) * (p ** j) * ((1 - p) ** (n - j)) * math.comb(n - i - 1, j - i) *                ((eta1 / (eta1 + eta2)) ** (j - i)) * ((eta2 / (eta1 + eta2)) ** (n - j))
     return Pni
+
+
+# In[58]:
+
 
 def Qni(n, i, p, eta1, eta2):
     Qni = 0
     for j in range(i, n):
-        Qni += math.comb(n, j) * ((1 - p) ** j) * (p ** (n - j)) * math.comb(n - i - 1, j - i) * \
-               ((eta2 / (eta1 + eta2)) ** (j - i)) * ((eta1 / (eta1 + eta2)) ** (n - j))
+        Qni += math.comb(n, j) * ((1 - p) ** j) * (p ** (n - j)) * math.comb(n - i - 1, j - i) *                ((eta2 / (eta1 + eta2)) ** (j - i)) * ((eta1 / (eta1 + eta2)) ** (n - j))
     return (1 - p) ** n
 
+
+# In[79]:
+
+
 def cprob(mu, eta1, eta2, la, p, sig, aa, bigT, nStep):
-    def IITwo(jj, ll, aa, bb, dd, nStep):
+    def IITwo(k):
         IITwo = 0
-        for k in range(1, nStep+1):
-            IITwo += Table(II(k-1, aa - mu * bigT, -eta1, -1/(sig*math.sqrt(bigT)), -(sig*math.sqrt(bigT))*eta1))
+        for k in range(1, nStep + 1):
+            IITwo += II(k-1, aa - mu * bigT, -eta1, -1/(sig*math.sqrt(bigT)), -(sig*math.sqrt(bigT))*eta1)
         return IITwo
 
-    def IIFour(jj, ll, aa, bb, dd, nStep):
+    def IIFour(k):
         IIFour = 0
         for k in range(1, nStep+1):
-            IIFour += Table(II(k-1, aa - mu * bigT, eta2, 1/(sig*math.sqrt(bigT)), -(sig*math.sqrt(bigT))*eta2))
+            IIFour += II(k-1, aa - mu * bigT, eta2, 1/(sig*math.sqrt(bigT)), -(sig*math.sqrt(bigT))*eta2)
         return IIFour
 
     def PiN(n):
-        return math.exp(-la * bigT) * ((la * bigT) ** n) / math.factorial(n)
+        return math.exp(-la*bigT) * ((la*bigT)**n) / math.factorial(n)
 
-    def PiN_Pni():
-        PiNPni = []
-        for n in range(nStep):
-            for k in range(n):
-                PiNPni.append(pd.DataFrame(PiN(n) * Pni(n, k, p, eta1, eta2) * ((sig * math.sqrt(bigT) * eta1) ** k)))
-        return PiNPni
+    def PiNPni():
+        result = 0
+        for n in range(1, nStep+1):
+            for k in range(1, n+1):
+                result += PiN(n) * Pni(n, k, p, eta1, eta2) * ((sig*math.sqrt(bigT)*eta1)**k)
+        return result
 
-    def PiN_Qni():
-        PiNQni = []
-        for n in range(nStep):
-            for k in range(n):
-                PiNQni.append(pd.DataFrame(PiN(n) * Qni(n, k, p, eta1, eta2) * ((sig * math.sqrt(bigT) * eta2) ** k)))
-        return PiNQni
+    def PiNQni():
+        result = 0
+        for n in range(1, nStep+1):
+            for k in range(1, n+1):
+                result += PiN(n) * Qni(n, k, p, eta1, eta2) * ((sig*math.sqrt(bigT)*eta2)**k)
+        return result
 
     sec = 0
-    for n in range(nStep):
-        for k in range(n):
-            sec += PiN_Pni[(n, k)] * IITwo[(k)]
-    
+    for n in range(1, nStep+1):
+        for k in range(1, n+1):
+            sec += PiNPni() * IITwo(k)
+
     fourth = 0
-    for n in range(nStep):
-        for k in range(n):
-            fourth += PiN_Qni[(n, k)] * IIFour[(k)]
-    
-    cprob = (sec * math.exp(((sig * eta1) ** 2) * bigT / 2) + fourth * math.exp(((sig * eta2) ** 2) * bigT / 2)) / (
-                math.sqrt(2 * math.pi) * sig * math.sqrt(bigT)) + \
-             math.exp(-la * bigT) * phi(-(aa - mu * bigT) / (sig * math.sqrt(bigT)))
-    
+    for n in range(1, nStep+1):
+        for k in range(1, n+1):
+            fourth += PiNQni() * IIFour(k)
+
+
+    cprob = (sec * math.exp(((sig*eta1)**2)*bigT/2) + fourth * math.exp(((sig*eta2)**2)*bigT/2)) / (math.sqrt(2*math.pi) * sig * math.sqrt(bigT)) +             math.exp(-la*bigT) * phi(-(aa- mu*bigT)/(sig*math.sqrt(bigT)))
+
     return cprob
+
+
+# In[80]:
+
 
 def callOR(eta1, eta2, la, p, sig, rr, bigS, bigK, bigT, nStep):
     def zetaaOR():
@@ -160,6 +193,10 @@ def callOR(eta1, eta2, la, p, sig, rr, bigS, bigK, bigT, nStep):
     
     return callOR
 
+
+# In[81]:
+
+
 def call(eta1, eta2, la, p, sig, bond, bigF, bigK, bigT, nStep):
     def zetaa():
         return p * eta1 / (eta1 - 1) + (1 - p) * eta2 / (eta2 + 1) - 1
@@ -190,3 +227,16 @@ def call(eta1, eta2, la, p, sig, bond, bigF, bigK, bigT, nStep):
                                   nStep))
     
     return call
+
+
+# In[83]:
+
+
+call(10, 5, 1, 0.4, 0.16, 0.05, 100, 98, 0.5, 20 )
+
+
+# In[ ]:
+
+
+
+
